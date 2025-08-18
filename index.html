@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BaaS 損益分岐シミュレーター / Break-even Simulator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.2.1/dist/chartjs-plugin-annotation.min.js"></script>
+<style>
+  body {
+    background: #121826; 
+    color: white; 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    padding: 20px; 
+    margin: 0;
+  }
+  h1, h2 {
+    text-align: center;
+  }
+  .container {
+    max-width: 900px;
+    margin: auto;
+  }
+  fieldset {
+    border-radius: 10px;
+    border: 1px solid #4caf50;
+    margin-bottom: 1.5rem;
+    padding: 1rem 1.5rem;
+  }
+  legend {
+    font-weight: 700;
+    font-size: 1.3rem;
+    color: #4caf50;
+  }
+  label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.6rem;
+    font-weight: 600;
+    color: white;
+  }
+  label.assist-label {
+    font-weight: 600;
+  }
+  label.sub-param {
+    color: white;
+    font-weight: 500;
+    justify-content: space-between;
+  }
+
+ label.gray-label {
+    color: #888888;
+	padding-left: 20px;
+  }
+  input[type=number], input[type=range], input[type=text] {
+    width: 150px;
+    background: #334155;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    padding: 6px 10px;
+    font-size: 1rem;
+    text-align: center;
+  }
+  input[readonly] {
+    background: #556677;
+    color: #ccc;
+  }
+  input.disabled-input {
+    background-color: #556677 !important;
+    color: #ccc !important;
+    border: none;
+  }
+  input[type=range] {
+    width: 250px;
+  }
+  label[for="baasPriceRange"] {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: nowrap;
+  }
+  #baasPriceRange {
+    flex: 2;
+  }
+  #baasPriceDisplay {
+    width: 80px;
+    text-align: center;
+    font-weight: bold;
+  }
+  .slider-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .note {
+    font-size: 0.9rem;
+    color: #a0a0a0;
+    margin-top: 4px;
+    white-space: pre-line;
+  }
+  #breakevenDisplay {
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: #4caf50;
+    text-align: center;
+    margin: 1rem 0;
+  }
+  #breakevenDisplay.no-break-even {
+    color: #ef4444;
+  }
+  #chartWrapper {
+    width: 100%;
+    max-width: 900px;
+    margin-top: 2rem;
+    height: 60vh;
+    min-height: 400px;
+  }
+  canvas {
+    width: 100% !important;
+    height: 100% !important;
+    background: #1e293b;
+    border-radius: 12px;
+  }
+  footer {
+    margin-top: 3rem;
+    font-size: 0.9rem;
+    color: #bbb;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  footer h2 {
+    color: #4caf50;
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+  footer table {
+    width: 100%;
+    border-collapse: collapse;
+    color: white;
+  }
+  footer th, footer td {
+    border: 1px solid #444;
+    padding: 0.5rem 0.7rem;
+    text-align: center;
+  }
+  footer th {
+    background-color: #334155;
+  }
+  .total-row {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #4caf50;
+    text-align: right;
+    padding-top: 0.6rem;
+  }
+  button#resetBtn {
+    background-color: #4caf50;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-weight: 700;
+    font-size: 1rem;
+    color: white;
+    cursor: pointer;
+    margin: 1rem auto;
+    display: block;
+  }
+  button#resetBtn:hover {
+    background-color: #3b8e3b;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>BaaS 損益分岐シミュレーター<br />BaaS Break-even Simulator</h1>
+
+  <fieldset>
+    <legend>General / 一般設定</legend>
+    <label for="electricityPrice">電気代 Electricity Price ($/kWh):
+      <input type="text" id="electricityPrice" inputmode="decimal" pattern="[0-9,]*" value="0.10" />
+    </label>
+    <label for="gasolinePrice">ガソリン単価 Gasoline Price ($/L):
+      <input type="text" id="gasolinePrice" inputmode="decimal" pattern="[0-9,]*" value="1.20" />
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Sales / 売上 (per rider per year)</legend>
+    <label for="baasPriceRange" style="flex-wrap: nowrap;">
+      <span style="flex: 1;">BaaS単価 BaaS Price ($/km):</span>
+      <input type="range" id="baasPriceRange" min="0.001" max="0.1" step="0.001" value="0.03" />
+      <span id="baasPriceDisplay">0.015</span>
+    </label>
+    <div class="note" id="priceNotes"></div>
+    <label for="dailyDistance">1日あたり走行距離 Distance per Day (km):
+      <input type="text" id="dailyDistance" inputmode="numeric" pattern="[0-9,]*" value="100" />
+    </label>
+    <label for="operatingDays">年間稼働日数 Operating Days per Year (days):
+      <input type="text" id="operatingDays" inputmode="numeric" pattern="[0-9,]*" value="250" />
+    </label>
+    <div class="total-row" id="salesTotal">売上合計 Sales Total (per rider per year): $0</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Variable Costs / 変動費 (per rider per year)</legend>
+    <label for="insuranceCost">保険費 Insurance Cost ($/rider/year):
+      <input type="text" id="insuranceCost" inputmode="numeric" pattern="[0-9,]*" value="200" />
+    </label>
+
+   <label class="sub-param" for="annualElectricCost">年間電気代 Annual Electric Cost ($/rider/year):
+      <input type="text" id="annualElectricCost" readonly class="disabled-input" />
+    </label>
+
+    <label class="sub-param gray-label" for="annualElectricUsage">年間電気使用量 Annual Electric Usage (kWh/rider/year):
+      <input type="text" id="annualElectricUsage" readonly class="disabled-input" />
+    </label>
+
+    <label class="sub-param" for="batteryDepreciation">電池償却費 Battery Depreciation ($/rider/year):
+      <input type="text" id="batteryDepreciation" readonly class="disabled-input" />
+    </label>
+
+
+    <label class="sub-param gray-label" for="batteryUnitPrice">電池単価 Battery Unit Price ($/kWh):
+      <input type="text" id="batteryUnitPrice" inputmode="numeric" pattern="[0-9,]*" value="500" />
+    </label>
+    <label class="sub-param gray-label" for="batteryCapacity">電池使用可能容量 Battery mobility usable capacity (kWh):
+      <input type="text" id="batteryCapacity" inputmode="numeric" pattern="[0-9,]*" value="4500" />
+    </label>
+
+ 
+
+    <div class="total-row" id="variableTotal">変動費合計 Variable Costs Total ($/rider/year): $0</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Fixed Costs / 固定費 (per year)</legend>
+    <label for="stationCost">充電ステーション償却費 Charging Station Depreciation ($/year):
+      <input type="text" id="stationCost" inputmode="numeric" pattern="[0-9,]*" value="200000" />
+    </label>
+    <label for="otherFixedCost">その他管理費 Other Fixed Costs ($/year):
+      <input type="text" id="otherFixedCost" inputmode="numeric" pattern="[0-9,]*" value="500000" />
+    </label>
+    <div class="total-row" id="fixedTotal">固定費合計 Fixed Costs Total ($/year): $0</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Efficiency Parameters / 効率パラメータ</legend>
+    <label for="electricEfficiency">電気効率 Electric Efficiency (km/kWh):
+      <input type="text" id="electricEfficiency" inputmode="decimal" pattern="[0-9,]*" value="30" />
+    </label>
+    <label for="gasolineEfficiency">ガソリン燃費 Gasoline Efficiency (km/L):
+      <input type="text" id="gasolineEfficiency" inputmode="decimal" pattern="[0-9,]*" value="30" />
+    </label>
+  </fieldset>
+
+  <button id="resetBtn">リセット Reset</button>
+
+  <div id="breakevenDisplay">損益分岐台数 / Break-even Bike Count: --</div>
+
+  <div id="chartWrapper">
+    <canvas id="breakEvenChart"></canvas>
+  </div>
+
+  <footer>
+    <h2>参考データ / Reference Data for African Countries</h2>
+    <table>
+      <thead>
+        <tr><th>国 / Country</th><th>Gasoline Price ($/L)</th><th>Electric Price ($/kWh)</th><th>Estimated urban bike market size (unit)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>ナイジェリア / Nigeria</td><td>0.45</td><td>0.09</td><td>150,000</td></tr>
+        <tr><td>ケニア / Kenya</td><td>1.15</td><td>0.19</td><td>50,000</td></tr>
+        <tr><td>南アフリカ / South Africa</td><td>1.10</td><td>0.12</td><td>120,000</td></tr>
+        <tr><td>エジプト / Egypt</td><td>0.80</td><td>0.13</td><td>100,000</td></tr>
+        <tr><td>タンザニア / Tanzania</td><td>1.20</td><td>0.14</td><td>30,000</td></tr>
+        <tr><td>ウガンダ / Uganda</td><td>1.05</td><td>0.15</td><td>20,000</td></tr>
+        <tr><td>モロッコ / Morocco</td><td>1.00</td><td>0.11</td><td>40,000</td></tr>
+        <tr><td>アルジェリア / Algeria</td><td>0.55</td><td>0.07</td><td>25,000</td></tr>
+        <tr><td>エチオピア / Ethiopia</td><td>0.90</td><td>0.10</td><td>15,000</td></tr>
+        <tr><td>セネガル / Senegal</td><td>1.30</td><td>0.16</td><td>18,000</td></tr>
+      </tbody>
+    </table>
+  </footer>
+</div>
+
+<script>
+(() => {
+  Chart.register(window['chartjs-plugin-annotation']);
+
+  const elecEl = document.getElementById('electricityPrice');
+  const gasEl = document.getElementById('gasolinePrice');
+  const baasRange = document.getElementById('baasPriceRange');
+  const baasDisplay = document.getElementById('baasPriceDisplay');
+  const dailyDistEl = document.getElementById('dailyDistance');
+  const operDaysEl = document.getElementById('operatingDays');
+  const insuranceEl = document.getElementById('insuranceCost');
+  const batteryPriceEl = document.getElementById('batteryUnitPrice');
+  const batteryCapEl = document.getElementById('batteryCapacity');
+  const annualElecUseEl = document.getElementById('annualElectricUsage');
+  const annualElecCostEl = document.getElementById('annualElectricCost');
+  const batteryDepreEl = document.getElementById('batteryDepreciation');
+  const stationCostEl = document.getElementById('stationCost');
+  const otherFixedEl = document.getElementById('otherFixedCost');
+  const breakevenDisplay = document.getElementById('breakevenDisplay');
+  const salesTotalEl = document.getElementById('salesTotal');
+  const variableTotalEl = document.getElementById('variableTotal');
+  const fixedTotalEl = document.getElementById('fixedTotal');
+  const priceNotesEl = document.getElementById('priceNotes');
+  const electricEffEl = document.getElementById('electricEfficiency');
+  const gasEffEl = document.getElementById('gasolineEfficiency');
+
+  const ctx = document.getElementById('breakEvenChart').getContext('2d');
+  let chart = null;
+
+  function formatNumberWithCommas(value, decimals=2){
+    const num = Number(String(value).replace(/,/g,''));
+    if(isNaN(num)) return '';
+    return num.toLocaleString(undefined, {minimumFractionDigits:decimals, maximumFractionDigits:decimals});
+  }
+  function parseNumberFromInput(value){
+    return Number(String(value).replace(/,/g,''));
+  }
+
+  function setupCommaInput(el, decimals=0){
+    el.addEventListener('focus', () => {
+      el.value = String(el.value).replace(/,/g,'');
+    });
+    el.addEventListener('blur', () => {
+      el.value = formatNumberWithCommas(el.value, decimals);
+      update();
+    });
+    el.value = formatNumberWithCommas(el.value, decimals);
+  }
+
+  [elecEl, gasEl].forEach(el => setupCommaInput(el, 3));
+  [dailyDistEl, operDaysEl, insuranceEl, batteryPriceEl, batteryCapEl, stationCostEl, otherFixedEl].forEach(el => setupCommaInput(el, 0));
+  [electricEffEl, gasEffEl].forEach(el => setupCommaInput(el, 1));
+
+  baasRange.addEventListener('input', () => {
+    baasDisplay.textContent = Number(baasRange.value).toFixed(3);
+    update();
+  });
+  baasDisplay.textContent = Number(baasRange.value).toFixed(3);
+
+  function update(){
+    const electricityPrice = parseNumberFromInput(elecEl.value);
+    const gasolinePrice = parseNumberFromInput(gasEl.value);
+    const baasPrice = Number(baasRange.value);
+    const dailyDistance = parseNumberFromInput(dailyDistEl.value);
+    const operatingDays = parseNumberFromInput(operDaysEl.value);
+    const insuranceCost = parseNumberFromInput(insuranceEl.value);
+    const batteryUnitPrice = parseNumberFromInput(batteryPriceEl.value);
+    const batteryCapacity = parseNumberFromInput(batteryCapEl.value);
+    const stationCost = parseNumberFromInput(stationCostEl.value);
+    const otherFixedCost = parseNumberFromInput(otherFixedEl.value);
+    const electricEfficiency = parseNumberFromInput(electricEffEl.value) || 30;
+    const gasolineEfficiency = parseNumberFromInput(gasEffEl.value) || 30;
+
+    const minPrice =  electricityPrice / electricEfficiency ;
+    const maxCompetitorPrice =  gasolinePrice / gasolineEfficiency ;
+    priceNotesEl.textContent = 
+      `電気代に基づく最低想定単価/Min price from Electricity Price($/km) : $${minPrice.toFixed(3)}\n最高競合単価/Max price from Gasoline Price($/km): $${maxCompetitorPrice.toFixed(3)}`;
+
+    const annualDistance = dailyDistance * operatingDays;
+    const salesTotal = baasPrice * annualDistance;
+
+    salesTotalEl.textContent = `売上合計 Sales Total (per rider per year): $${formatNumberWithCommas(salesTotal,2)}`;
+
+    const annualElectricUsage = annualDistance / electricEfficiency;
+    annualElecUseEl.value = formatNumberWithCommas(annualElectricUsage,2);
+
+    const annualElectricCost = annualElectricUsage * electricityPrice;
+    annualElecCostEl.value = formatNumberWithCommas(annualElectricCost,2);
+
+    const batteryDepreciation = (batteryUnitPrice / batteryCapacity) * annualElectricUsage ;
+    batteryDepreEl.value = formatNumberWithCommas(batteryDepreciation,0);
+
+    const variableTotal = insuranceCost + annualElectricCost + batteryDepreciation;
+    variableTotalEl.textContent = `変動費合計 Variable Costs Total ($/rider/year): $${formatNumberWithCommas(variableTotal,2)}`;
+
+    const fixedTotal = stationCost + otherFixedCost;
+    fixedTotalEl.textContent = `固定費合計 Fixed Costs Total ($/year): $${formatNumberWithCommas(fixedTotal,0)}`;
+
+    // 損益分岐点台数の計算
+    // 売上 * 台数 = 固定費 + 変動費 * 台数
+    // → (売上 - 変動費) * 台数 = 固定費
+    // → 台数 = 固定費 / (売上 - 変動費)
+    const denominator = salesTotal - variableTotal;
+    let breakevenCount = null;
+    if (denominator > 0){
+      breakevenCount = fixedTotal / denominator;
+      breakevenDisplay.textContent = `損益分岐台数 / Break-even Bike Count: ${breakevenCount.toFixed(1)} 台`;
+      breakevenDisplay.classList.remove('no-break-even');
+    } else {
+      breakevenDisplay.textContent = '損益分岐台数 / Break-even Bike Count: 計算不可（売上 ≤ 変動費）';
+      breakevenDisplay.classList.add('no-break-even');
+    }
+
+    updateChart(breakevenCount, fixedTotal, variableTotal, salesTotal);
+  }
+
+  function updateChart(breakevenCount, fixedTotal, variableTotal, salesTotal) {
+    const maxBikes = breakevenCount && breakevenCount > 0 ? Math.ceil(breakevenCount * 2) : 100;
+
+    const labels = [];
+    const totalCosts = [];
+    const sales = [];
+
+    for(let i=0; i<=maxBikes; i+=5){
+      labels.push(i.toString());
+      totalCosts.push(fixedTotal + variableTotal * i);
+      sales.push(salesTotal * i);
+    }
+
+    const data = {
+      labels: labels,
+      datasets: [
+        {
+          label: 'コスト合計 Total Costs',
+          data: totalCosts,
+          borderColor: 'rgba(239, 68, 68, 0.9)', // 赤系
+          backgroundColor: 'rgba(239, 68, 68, 0.4)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.1,
+          pointRadius: 0,
+          yAxisID: 'y',
+          type: 'line'
+        },
+        {
+          label: '売上 Sales',
+          data: sales,
+          borderColor: 'rgba(33, 150, 243, 0.9)', // 青系
+          backgroundColor: 'rgba(33, 150, 243, 0.4)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.1,
+          pointRadius: 0,
+          yAxisID: 'y',
+          type: 'line'
+        }
+      ]
+    };
+
+    const options = {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
+      stacked: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { color: 'white', font: { weight: '700' } }
+        },
+        tooltip: {
+          callbacks: {
+            label: context => {
+              const val = context.parsed.y || 0;
+              return `${context.dataset.label}: $${val.toLocaleString(undefined, {maximumFractionDigits:0})}`;
+            }
+          }
+        },
+        annotation: {
+          annotations: breakevenCount && breakevenCount > 0 ? {
+            line1: {
+              type: 'line',
+              scaleID: 'x',
+              value: breakevenCount,
+              borderColor: 'red',
+              borderWidth: 3,
+              label: {
+                enabled: true,
+                content: '損益分岐台数 / Brea-even',
+                color: 'red',
+                position: 'start',
+                font: {weight: '700', size: 14}
+              }
+            }
+          } : {}
+        }
+      },
+      scales: {
+        x: {
+	 type: 'linear',  // ここを追加（カテゴリ軸 → 数値軸）
+          title: {display: true, text: 'バイク台数 / Number of Bikes', color: 'white', font: {weight: '700'}},
+          ticks: {color: 'white'}
+        },
+        y: {
+          title: {display: true, text: '金額 ($)', color: 'white', font: {weight: '700'}},
+          ticks: {
+            color: 'white',
+            callback: value => '$' + value.toLocaleString()
+          },
+          beginAtZero: true
+        }
+      }
+    };
+
+    if(chart){
+      chart.data = data;
+      chart.options = options;
+      chart.update();
+    } else {
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: data,
+        options: options,
+        plugins: [window['chartjs-plugin-annotation']]
+      });
+    }
+  }
+
+  function resetInputs(){
+    elecEl.value = "0.10";
+    gasEl.value = "1.20";
+    baasRange.value = "0.03";
+    baasDisplay.textContent = baasRange.value;
+    dailyDistEl.value = "100";
+    operDaysEl.value = "250";
+    insuranceEl.value = "200";
+    batteryPriceEl.value = "500";
+    batteryCapEl.value = "4500";
+    stationCostEl.value = "200000";
+    otherFixedEl.value = "500000";
+    electricEffEl.value = "30";
+    gasEffEl.value = "30";
+
+    // Reformat inputs for commas
+    [elecEl, gasEl].forEach(el => el.value = formatNumberWithCommas(el.value, 3));
+    [dailyDistEl, operDaysEl, insuranceEl, batteryPriceEl, batteryCapEl, stationCostEl, otherFixedEl].forEach(el => el.value = formatNumberWithCommas(el.value, 0));
+    [electricEffEl, gasEffEl].forEach(el => el.value = formatNumberWithCommas(el.value, 1));
+
+    update();
+  }
+
+  document.getElementById('resetBtn').addEventListener('click', resetInputs);
+
+  // 入力が変わったら更新
+  const inputElements = [elecEl, gasEl, dailyDistEl, operDaysEl, insuranceEl, batteryPriceEl, batteryCapEl, stationCostEl, otherFixedEl, electricEffEl, gasEffEl];
+  inputElements.forEach(el => {
+    el.addEventListener('input', () => {
+      // 入力値を数字以外排除
+      el.value = el.value.replace(/[^\d.,]/g, '');
+      update();
+    });
+  });
+
+  // 範囲スライダーは専用イベント済み
+
+  update(); // 初期表示
+
+})();
+</script>
+</body>
+</html>
